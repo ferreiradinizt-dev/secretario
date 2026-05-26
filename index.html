@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GrowthOS — Instagram Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --green: #00FF87;
+  --green-dim: #00c96a;
+  --bg: #080808;
+  --bg2: #0f0f0f;
+  --bg3: #161616;
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(0,255,135,0.3);
+  --text: #f0f0f0;
+  --muted: #666;
+  --muted2: #444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* NOISE OVERLAY */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+/* SCANLINE */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none; z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 20px 80px; }
+
+/* HEADER */
+.header {
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 40px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+}
+.header-left {}
+.logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.logo-tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 2px; color: var(--green);
+  border: 1px solid var(--green); padding: 3px 8px;
+}
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace;
+}
+.pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+h1 { font-size: clamp(28px, 5vw, 42px); font-weight: 800; line-height: 1.05; letter-spacing: -1px; }
+h1 span { color: var(--green); }
+.header-sub { font-size: 14px; color: var(--muted); margin-top: 8px; font-weight: 400; line-height: 1.5; }
+.header-right { text-align: right; flex-shrink: 0; }
+.version { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted2); letter-spacing: 1px; }
+.niche-badge {
+  margin-top: 8px; display: inline-block;
+  background: rgba(0,255,135,0.07); border: 1px solid rgba(0,255,135,0.2);
+  padding: 4px 10px; font-size: 11px; color: var(--green); letter-spacing: 1px;
+}
+
+/* SECTION */
+.section { margin-bottom: 40px; }
+.section-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 2px; color: var(--muted);
+  border-left: 2px solid var(--green); padding-left: 10px;
+  margin-bottom: 16px;
+}
+
+/* MODULE GRID */
+.mod-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px;
+  margin-bottom: 20px;
+}
+.mod-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 16px; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative; overflow: hidden;
+}
+.mod-card::before {
+  content: ''; position: absolute; top: 0; left: 0;
+  width: 2px; height: 100%; background: var(--green);
+  transform: scaleY(0); transform-origin: top;
+  transition: transform 0.2s;
+}
+.mod-card:hover { border-color: var(--border-hover); background: var(--bg3); }
+.mod-card:hover::before, .mod-card.active::before { transform: scaleY(1); }
+.mod-card.active { border-color: rgba(0,255,135,0.25); background: rgba(0,255,135,0.04); }
+.mod-num { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted2); margin-bottom: 8px; }
+.mod-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.mod-desc { font-size: 12px; color: var(--muted); line-height: 1.4; font-weight: 400; }
+
+/* ACTION PANEL */
+.action-panel {
+  background: var(--bg2); border: 1px solid var(--border); margin-bottom: 20px;
+}
+.panel-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+}
+.panel-name { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
+.panel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: auto; }
+.action-list { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.action-btn {
+  display: flex; align-items: center; gap: 14px;
+  background: transparent; border: 1px solid var(--border);
+  padding: 12px 14px; cursor: pointer;
+  font-family: 'Syne', sans-serif; width: 100%; text-align: left;
+  color: var(--text); transition: border-color 0.15s, background 0.15s;
+}
+.action-btn:hover { border-color: var(--border-hover); background: rgba(0,255,135,0.03); }
+.action-num { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--green); width: 20px; flex-shrink: 0; }
+.action-text { flex: 1; }
+.action-label { font-size: 14px; font-weight: 700; display: block; }
+.action-sub { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; font-weight: 400; }
+.action-arrow { color: var(--muted2); font-size: 16px; flex-shrink: 0; transition: transform 0.15s, color 0.15s; }
+.action-btn:hover .action-arrow { transform: translateX(3px); color: var(--green); }
+
+/* CONTEXT BOX */
+.ctx-box {
+  background: var(--bg2); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px;
+}
+.ctx-title { font-size: 13px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.5px; }
+.ctx-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+@media (max-width: 600px) { .ctx-grid { grid-template-columns: 1fr; } }
+.ctx-field {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Space Mono', monospace;
+  font-size: 12px; padding: 10px 12px; width: 100%;
+  outline: none; transition: border-color 0.15s;
+}
+.ctx-field:focus { border-color: rgba(0,255,135,0.4); }
+.ctx-field::placeholder { color: var(--muted2); }
+.ctx-field-full { grid-column: 1/-1; }
+.send-btn {
+  width: 100%; background: var(--green); color: #000;
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800;
+  padding: 13px; border: none; cursor: pointer; letter-spacing: 1px;
+  transition: background 0.15s; margin-top: 4px;
+}
+.send-btn:hover { background: var(--green-dim); }
+
+/* QUICK ACCESS */
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; }
+.quick-btn {
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 12px 14px; cursor: pointer; text-align: left;
+  font-family: 'Syne', sans-serif; color: var(--muted); font-size: 12px; font-weight: 500;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  line-height: 1.4;
+}
+.quick-btn:hover { border-color: var(--border-hover); color: var(--text); background: var(--bg3); }
+
+/* CHAT AREA */
+.chat-section { margin-top: 40px; }
+.chat-box {
+  background: var(--bg2); border: 1px solid var(--border);
+  min-height: 300px; max-height: 500px; overflow-y: auto;
+  padding: 20px; margin-bottom: 12px;
+  font-size: 14px; line-height: 1.7; font-weight: 400;
+  scroll-behavior: smooth;
+}
+.chat-box::-webkit-scrollbar { width: 4px; }
+.chat-box::-webkit-scrollbar-track { background: transparent; }
+.chat-box::-webkit-scrollbar-thumb { background: var(--muted2); }
+.msg { margin-bottom: 20px; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg-role {
+  font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 1.5px;
+  margin-bottom: 6px;
+}
+.msg-role.user { color: var(--muted); }
+.msg-role.agent { color: var(--green); }
+.msg-content { color: var(--text); }
+.msg-content.user { color: var(--muted); font-size: 13px; }
+.empty-state { color: var(--muted2); font-family: 'Space Mono', monospace; font-size: 11px; text-align: center; padding: 60px 0; }
+
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px;
+  padding: 12px 16px; outline: none;
+  transition: border-color 0.15s;
+}
+.chat-input:focus { border-color: rgba(0,255,135,0.4); }
+.chat-input::placeholder { color: var(--muted2); }
+.chat-send {
+  background: var(--green); color: #000; border: none;
+  padding: 0 20px; cursor: pointer; font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 13px; letter-spacing: 1px;
+  transition: background 0.15s; white-space: nowrap;
+}
+.chat-send:hover { background: var(--green-dim); }
+.chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.typing {
+  font-family: 'Space Mono', monospace; font-size: 11px; color: var(--green);
+  padding: 8px 0; display: none;
+}
+.typing.visible { display: block; }
+
+/* FOOTER */
+footer {
+  margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted2);
+  letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-row">
+        <div class="logo-tag">GROWTHOS v1.0</div>
+        <div class="status-pill"><span class="pulse"></span> AGENTE ATIVO</div>
+      </div>
+      <h1>Instagram<br><span>Growth Agent</span></h1>
+      <p class="header-sub">Estrategista de conteúdo · Analista de algoritmo<br>Criador de conteúdo viral · Social Media IA</p>
+    </div>
+    <div class="header-right">
+      <div class="version">BUILD 2026.1</div>
+      <div class="niche-badge">DINHEIRO · MENTALIDADE · LIBERDADE</div>
+    </div>
+  </header>
+
+  <div class="section">
+    <div class="section-label">MÓDULOS DO SISTEMA</div>
+    <div class="mod-grid" id="modGrid">
+      <div class="mod-card active" onclick="selectMod(this,'conteudo')">
+        <div class="mod-num">01</div>
+        <div class="mod-name">Gerador de Conteúdo</div>
+        <div class="mod-desc">Carrosséis, reels, hooks, legendas e roteiros prontos</div>
+      </div>
+      <div class="mod-card" onclick="selectMod(this,'tendencias')">
+        <div class="mod-num">02</div>
+        <div class="mod-name">Análise de Tendências</div>
+        <div class="mod-desc">Temas virais, padrões de retenção e formatos em alta</div>
+      </div>
+      <div class="mod-card" onclick="selectMod(this,'calendario')">
+        <div class="mod-num">03</div>
+        <div class="mod-name">Calendário Editorial</div>
+        <div class="mod-desc">Planejamento semanal e mensal com horários otimizados</div>
+      </div>
+      <div class="mod-card" onclick="selectMod(this,'perfil')">
+        <div class="mod-num">04</div>
+        <div class="mod-name">Consultoria de Perfil</div>
+        <div class="mod-desc">Bio, branding, posicionamento e autoridade</div>
+      </div>
+      <div class="mod-card" onclick="selectMod(this,'engajamento')">
+        <div class="mod-num">05</div>
+        <div class="mod-name">Automação de Engajamento</div>
+        <div class="mod-desc">Respostas, DMs e estratégia de comunidade</div>
+      </div>
+      <div class="mod-card" onclick="selectMod(this,'viral')">
+        <div class="mod-num">06</div>
+        <div class="mod-name">Sistema Viral</div>
+        <div class="mod-desc">Gatilhos emocionais, saves e fórmula de compartilhamento</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">AÇÕES DO MÓDULO</div>
+    <div class="action-panel">
+      <div class="panel-bar">
+        <span class="panel-name" id="panelName">GERADOR DE CONTEÚDO</span>
+        <span class="panel-dot"></span>
+      </div>
+      <div class="action-list" id="actionList"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">CONTEXTO (OPCIONAL)</div>
+    <div class="ctx-box">
+      <div class="ctx-title">Personalize o output do agente</div>
+      <div class="ctx-grid">
+        <input class="ctx-field ctx-field-full" id="ctxTema" type="text" placeholder="Tema ou assunto específico (ex: hábitos de pessoas ricas)" />
+        <input class="ctx-field" id="ctxFormato" type="text" placeholder="Formato (ex: carrossel)" />
+        <input class="ctx-field" id="ctxTom" type="text" placeholder="Tom (ex: agressivo)" />
+        <input class="ctx-field" id="ctxPublico" type="text" placeholder="Público (ex: 18-25 anos)" />
+      </div>
+      <button class="send-btn" onclick="dispatchMain()">→ ACIONAR MÓDULO ATIVO</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">ATALHOS RÁPIDOS</div>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="fire('Gere um hook viral de carrossel sobre mentalidade de riqueza para Instagram, estilo provocativo e psicológico')">Hook de carrossel viral</button>
+      <button class="quick-btn" onclick="fire('Crie um calendário editorial semanal completo para Instagram no nicho de dinheiro e liberdade financeira com horários otimizados para cada formato')">Calendário semanal</button>
+      <button class="quick-btn" onclick="fire('Gere 10 ideias de reels virais para o nicho de mentalidade, disciplina e dinheiro no Instagram 2026 com hook de abertura para cada um')">10 ideias de reels</button>
+      <button class="quick-btn" onclick="fire('Analise e reescreva uma bio magnética do Instagram para o nicho de liberdade financeira e mentalidade com CTA poderoso — dê 3 versões')">Otimizar bio</button>
+      <button class="quick-btn" onclick="fire('Crie 10 respostas automáticas humanizadas para comentários em posts de Instagram sobre mentalidade e dinheiro que incentivem mais engajamento')">Respostas automáticas</button>
+      <button class="quick-btn" onclick="fire('Crie um roteiro completo de reel de 30 segundos sobre o motivo pelo qual pessoas pobres continuam pobres — tom forte, psicológico e viral')">Roteiro de reel 30s</button>
+      <button class="quick-btn" onclick="fire('Liste e explique os 10 gatilhos emocionais mais poderosos para viralização no Instagram em 2026 para o nicho de dinheiro e mentalidade')">Gatilhos virais</button>
+      <button class="quick-btn" onclick="fire('Gere um carrossel completo de 10 slides sobre hábitos que separam ricos de pobres — estilo verdades difíceis, frase curta por slide, hook forte e CTA viral')">Carrossel completo</button>
+      <button class="quick-btn" onclick="fire('Quais são os melhores horários para postar no Instagram no Brasil em 2026 para um perfil de mentalidade e dinheiro? Detalhe por formato e dia da semana')">Melhores horários</button>
+      <button class="quick-btn" onclick="fire('Crie uma estratégia completa de construção de autoridade no Instagram para o nicho de liberdade financeira e mentalidade — o que postar, como falar e como se posicionar')">Estratégia de autoridade</button>
+      <button class="quick-btn" onclick="fire('Como maximizar o número de saves em posts de Instagram no nicho de dinheiro e mentalidade? Crie uma estratégia com tipos de conteúdo e CTAs que geram saves')">Estratégia de saves</button>
+      <button class="quick-btn" onclick="fire('Crie um plano de conteúdo mensal para Instagram no nicho de mentalidade, dinheiro e disciplina — 30 ideias organizadas por semana com formato e objetivo')">Plano mensal</button>
+    </div>
+  </div>
+
+  <div class="chat-section">
+    <div class="section-label">TERMINAL DO AGENTE</div>
+    <div class="chat-box" id="chatBox">
+      <div class="empty-state">// aguardando instrução do operador</div>
+    </div>
+    <div class="typing" id="typing">▌ agente processando...</div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chatInput" type="text" placeholder="Digite uma instrução personalizada para o agente..." onkeydown="if(event.key==='Enter') sendChat()" />
+      <button class="chat-send" id="sendBtn" onclick="sendChat()">ENVIAR</button>
+    </div>
+  </div>
+
+  <footer>
+    <span>GROWTHOS · INSTAGRAM GROWTH AGENT</span>
+    <span>NICHO: DINHEIRO & MENTALIDADE · 18–35</span>
+  </footer>
+</div>
+
+<script>
+const modules = {
+  conteudo: {
+    name: 'GERADOR DE CONTEÚDO',
+    actions: [
+      { label: 'Criar carrossel completo', sub: '8–10 slides prontos para postar', prompt: 'Crie um carrossel completo de 10 slides para Instagram no nicho de dinheiro e liberdade financeira. Tom provocativo, frases curtas, slide 1 com hook extremamente forte e último slide com CTA viral.' },
+      { label: 'Roteiro de reel viral', sub: 'Script com gancho, desenvolvimento e CTA', prompt: 'Crie um roteiro completo de reel viral de 30–60 segundos para Instagram no nicho de mentalidade e dinheiro. Inclua: hook de abertura (0–3s), desenvolvimento rápido e CTA final impactante.' },
+      { label: 'Banco de hooks', sub: '20 hooks prontos para qualquer post', prompt: 'Gere 20 hooks virais para Instagram no nicho de dinheiro, mentalidade e liberdade financeira. Misture estilos: provocativo, estatística chocante, pergunta direta, verdade dolorosa.' },
+      { label: 'Legenda com CTA viral', sub: 'Caption otimizada para engajamento máximo', prompt: 'Crie uma legenda completa para Instagram com CTA viral para o nicho de mentalidade e dinheiro. Inclua: frase de abertura poderosa, corpo e 3 CTAs diferentes (save, compartilhar, comentar).' },
+    ]
+  },
+  tendencias: {
+    name: 'ANÁLISE DE TENDÊNCIAS',
+    actions: [
+      { label: 'Temas virais do momento', sub: 'O que está explodindo no nicho agora', prompt: 'Analise e liste os 10 temas mais virais no Instagram 2026 para o nicho de dinheiro, mentalidade e liberdade financeira. Para cada tema: por que está viral, formato ideal e ângulo único de conteúdo.' },
+      { label: 'Padrões de retenção', sub: 'O que prende atenção no algoritmo', prompt: 'Explique os principais padrões de retenção do algoritmo do Instagram em 2026 para o nicho de motivação e dinheiro. O que garante mais tempo de visualização em reels e carrosséis?' },
+      { label: 'Formatos em alta', sub: 'Quais formatos performam mais agora', prompt: 'Liste os formatos de conteúdo com maior desempenho no Instagram em 2026 para o nicho de mentalidade e sucesso. Classifique por: alcance, engajamento, saves e compartilhamentos.' },
+      { label: 'Reaproveitar conteúdo', sub: 'Transformar 1 ideia em 5 formatos', prompt: 'Mostre como reaproveitar um único conteúdo sobre mentalidade de riqueza em pelo menos 5 formatos diferentes para Instagram: carrossel, reel, story, post único e conteúdo de engajamento.' },
+    ]
+  },
+  calendario: {
+    name: 'CALENDÁRIO EDITORIAL',
+    actions: [
+      { label: 'Calendário semanal completo', sub: '7 dias com formato, horário e tema', prompt: 'Crie um calendário editorial semanal completo para Instagram no nicho de dinheiro e liberdade financeira. Para cada dia: horário ideal, formato, tema, hook e objetivo (alcance, engajamento ou conversão).' },
+      { label: 'Plano mensal de conteúdo', sub: '30 dias de ideias prontas', prompt: 'Crie um plano de conteúdo mensal para Instagram no nicho de mentalidade, dinheiro e disciplina. 30 ideias organizadas por semana, alternando formatos e temas para máximo crescimento.' },
+      { label: 'Melhores horários de postagem', sub: 'Quando postar para cada objetivo', prompt: 'Quais são os melhores horários para postar no Instagram em 2026 para um perfil de mentalidade e dinheiro com público de 18–35 anos no Brasil? Diferencie por formato e objetivo.' },
+      { label: 'Frequência ideal de postagem', sub: 'Quantas vezes por semana crescer rápido', prompt: 'Qual a frequência ideal de postagem no Instagram em 2026 para crescimento acelerado no nicho de dinheiro e mentalidade? Detalhe por formato: feed, reels e stories.' },
+    ]
+  },
+  perfil: {
+    name: 'CONSULTORIA DE PERFIL',
+    actions: [
+      { label: 'Reescrever bio magnética', sub: 'Bio que converte visitante em seguidor', prompt: 'Crie 3 versões de bio para Instagram no nicho de dinheiro, mentalidade e liberdade financeira. Cada versão com estilo diferente: provocativa, aspiracional e direta. Inclua proposta de valor, prova e CTA.' },
+      { label: 'Estratégia de identidade visual', sub: 'Estética, cores e estilo do feed', prompt: 'Descreva a identidade visual ideal para um perfil de Instagram no nicho de mentalidade, dinheiro e disciplina em 2026. Inclua: paleta de cores, estilo visual, tipografia e estética do feed.' },
+      { label: 'Posicionamento de marca', sub: 'Como se diferenciar na multidão', prompt: 'Como posicionar um perfil de Instagram no nicho de dinheiro e mentalidade para se diferenciar dos outros criadores em 2026? Crie uma estratégia de posicionamento única com proposta de valor clara.' },
+      { label: 'Estratégia de autoridade', sub: 'Como construir autoridade rápido', prompt: 'Crie uma estratégia de construção de autoridade no Instagram para o nicho de liberdade financeira e mentalidade. O que postar, como falar e como se posicionar para ser percebido como referência.' },
+    ]
+  },
+  engajamento: {
+    name: 'AUTOMAÇÃO DE ENGAJAMENTO',
+    actions: [
+      { label: 'Respostas para comentários', sub: '20 templates humanizados prontos', prompt: 'Crie 20 respostas automáticas humanizadas para comentários em posts de Instagram sobre mentalidade e dinheiro. Misture estilos: encorajador, provocativo, reflexivo e gerador de mais comentários.' },
+      { label: 'Templates de DM', sub: 'Mensagens que geram conexão real', prompt: 'Crie 10 templates de DM para Instagram no nicho de mentalidade e dinheiro. Inclua: boas-vindas a novos seguidores, resposta a elogios, resposta a perguntas e mensagem de conversão.' },
+      { label: 'Frases que geram comentários', sub: 'CTAs que explodem a caixa de entrada', prompt: 'Crie 15 frases e CTAs para posts de Instagram que incentivem comentários massivos no nicho de dinheiro e mentalidade. Use: perguntas provocativas, completar a frase, concordar ou discordar.' },
+      { label: 'Estratégia de comunidade', sub: 'Criar uma audiência fiel e engajada', prompt: 'Como construir uma comunidade fiel e engajada no Instagram no nicho de mentalidade, disciplina e dinheiro? Crie uma estratégia completa de gestão de comunidade com ações semanais.' },
+    ]
+  },
+  viral: {
+    name: 'SISTEMA VIRAL',
+    actions: [
+      { label: 'Gatilhos emocionais virais', sub: 'Psicologia do compartilhamento', prompt: 'Liste e explique os 10 gatilhos emocionais mais poderosos para viralização no Instagram em 2026 para o nicho de dinheiro e mentalidade. Para cada gatilho: como usar, exemplo de frase e formato ideal.' },
+      { label: 'Fórmula do compartilhamento', sub: 'O que faz um post ser compartilhado', prompt: 'Qual é a fórmula psicológica por trás dos posts mais compartilhados no Instagram no nicho de mentalidade e dinheiro? Explique os elementos que todo post viral tem e como replicar sistematicamente.' },
+      { label: 'Estratégia de saves', sub: 'Como maximizar salvamentos', prompt: 'Como maximizar o número de saves em posts de Instagram para o nicho de dinheiro, mentalidade e produtividade? Crie uma estratégia completa com tipos de conteúdo, frases e CTAs que geram saves.' },
+      { label: 'Análise de padrões virais', sub: 'O que os posts que explodem têm em comum', prompt: 'Analise os padrões dos posts mais virais do Instagram em 2026 no nicho de mentalidade e liberdade financeira. Quais elementos têm em comum? Como replicar sistematicamente para crescimento acelerado?' },
+    ]
+  }
+};
+
+let currentMod = 'conteudo';
+let conversationHistory = [];
+let isLoading = false;
+
+function selectMod(el, mod) {
+  document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  currentMod = mod;
+  renderActions(mod);
+}
+
+function renderActions(mod) {
+  const m = modules[mod];
+  document.getElementById('panelName').textContent = m.name;
+  const list = document.getElementById('actionList');
+  list.innerHTML = '';
+  m.actions.forEach((a, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.innerHTML = `<span class="action-num">0${i+1}</span><div class="action-text"><span class="action-label">${a.label}</span><span class="action-sub">${a.sub}</span></div><span class="action-arrow">→</span>`;
+    btn.onclick = () => {
+      let p = a.prompt;
+      const tema = document.getElementById('ctxTema').value;
+      const formato = document.getElementById('ctxFormato').value;
+      const tom = document.getElementById('ctxTom').value;
+      const publico = document.getElementById('ctxPublico').value;
+      if (tema) p += ' Tema específico: ' + tema + '.';
+      if (formato) p += ' Formato: ' + formato + '.';
+      if (tom) p += ' Tom: ' + tom + '.';
+      if (publico) p += ' Público: ' + publico + '.';
+      fire(p);
+    };
+    list.appendChild(btn);
+  });
+}
+
+function dispatchMain() {
+  const m = modules[currentMod];
+  const a = m.actions[0];
+  const tema = document.getElementById('ctxTema').value || 'mentalidade e dinheiro';
+  const formato = document.getElementById('ctxFormato').value || 'carrossel';
+  const tom = document.getElementById('ctxTom').value || 'provocativo e psicológico';
+  const publico = document.getElementById('ctxPublico').value || 'homens e mulheres 18–35 anos';
+  fire(`${a.prompt} Tema: ${tema}. Formato: ${formato}. Tom: ${tom}. Público: ${publico}.`);
+}
+
+function fire(prompt) {
+  document.getElementById('chatInput').value = prompt.length > 80 ? prompt.substring(0,80)+'...' : prompt;
+  callAgent(prompt);
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const val = input.value.trim();
+  if (!val || isLoading) return;
+  input.value = '';
+  callAgent(val);
+}
+
+function callAgent(prompt) {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  const box = document.getElementById('chatBox');
+  const empty = box.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg';
+  userMsg.innerHTML = `<div class="msg-role user">// OPERADOR</div><div class="msg-content user">${escHtml(prompt)}</div>`;
+  box.appendChild(userMsg);
+  box.scrollTop = box.scrollHeight;
+
+  document.getElementById('typing').classList.add('visible');
+
+  conversationHistory.push({ role: 'user', content: prompt });
+fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: `Você é o GrowthOS, um agente de IA especializado em crescimento extremo de Instagram. Seu nicho: dinheiro, mentalidade, liberdade financeira, disciplina, produtividade, psicologia do sucesso. Público: homens e mulheres 18–35 anos, ambiciosos, querem melhorar de vida.
+
+Você age como: estrategista agressivo de crescimento, criador de conteúdo elite, analista de algoritmo, copywriter viral, social media profissional.
+
+Seu tom é: forte, psicológico, provocativo, moderno, impactante, minimalista e altamente estratégico.
+
+Você NUNCA usa linguagem robótica, respostas genéricas, enrolação ou frases corporativas.
+
+Você gera: carrosséis prontos, roteiros de reels, hooks virais, calendários editoriais, estratégias de crescimento, respostas automáticas, análises de tendência, estratégias de branding e qualquer conteúdo viral para Instagram.
+
+Sempre seja direto, estratégico e entregue conteúdo pronto para usar. Formate bem suas respostas com estrutura clara.`,
+      messages: conversationHistory
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('typing').classList.remove('visible');
+    const text = (data.content || []).map(b => b.text || '').join('');
+    conversationHistory.push({ role: 'assistant', content: text });
+
+    const agentMsg = document.createElement('div');
+    agentMsg.className = 'msg';
+    agentMsg.innerHTML = `<div class="msg-role agent">// GROWTHOS</div><div class="msg-content">${formatText(text)}</div>`;
+    box.appendChild(agentMsg);
+    box.scrollTop = box.scrollHeight;
+  })
+  .catch(() => {
+    document.getElementById('typing').classList.remove('visible');
+    const errMsg = document.createElement('div');
+    errMsg.className = 'msg';
+    errMsg.innerHTML = `<div class="msg-role agent">// GROWTHOS</div><div class="msg-content" style="color:#ff4444">Erro de conexão. Verifique sua chave de API.</div>`;
+    box.appendChild(errMsg);
+    box.scrollTop = box.scrollHeight;
+  })
+  .finally(() => {
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+  });
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatText(t) {
+  return escHtml(t)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^#{1,3} (.+)$/gm, '<strong style="color:var(--green);display:block;margin-top:12px">$1</strong>')
+    .replace(/^[-•] (.+)$/gm, '<span style="display:block;padding-left:12px;border-left:2px solid var(--green);margin:3px 0">$1</span>')
+    .replace(/\n/g, '<br>');
+}
+
+renderActions('conteudo');
+</script>
+</body>
+</html>
